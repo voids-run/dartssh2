@@ -166,13 +166,60 @@ void main() {
       harness.dispose();
       client.close();
     });
+
+    test('passes agentForwarding to execute', () async {
+      final harness = _SessionHarness();
+      bool? forwarded;
+      final client = _TestSSHClient.withOptions((agentForwarding) async {
+        forwarded = agentForwarding;
+        scheduleMicrotask(() {
+          harness.sendExitStatus(0);
+          harness.close();
+        });
+        return harness.session;
+      });
+
+      await client.runWithResult('cmd', agentForwarding: true);
+
+      expect(forwarded, isTrue);
+
+      harness.dispose();
+      client.close();
+    });
+
+    test('preserves default agentForwarding behavior', () async {
+      final harness = _SessionHarness();
+      var observedDefault = false;
+      final client = _TestSSHClient.withOptions((agentForwarding) async {
+        observedDefault = agentForwarding == null;
+        scheduleMicrotask(() {
+          harness.sendExitStatus(0);
+          harness.close();
+        });
+        return harness.session;
+      });
+
+      await client.runWithResult('cmd');
+
+      expect(observedDefault, isTrue);
+
+      harness.dispose();
+      client.close();
+    });
   });
 }
 
 class _TestSSHClient extends SSHClient {
-  final Future<SSHSession> Function() _executeImpl;
+  final Future<SSHSession> Function(bool? agentForwarding) _executeImpl;
 
-  _TestSSHClient(this._executeImpl)
+  _TestSSHClient(Future<SSHSession> Function() executeImpl)
+      : _executeImpl = ((_) => executeImpl()),
+        super(
+          _FakeSSHSocket(),
+          username: 'demo',
+        );
+
+  _TestSSHClient.withOptions(this._executeImpl)
       : super(
           _FakeSSHSocket(),
           username: 'demo',
@@ -184,8 +231,9 @@ class _TestSSHClient extends SSHClient {
     SSHPtyConfig? pty,
     SSHX11Config? x11,
     Map<String, String>? environment,
+    bool? agentForwarding,
   }) {
-    return _executeImpl();
+    return _executeImpl(agentForwarding);
   }
 }
 

@@ -423,11 +423,16 @@ class SSHClient {
 
   /// Execute [command] on the remote side. Returns a [SSHChannel] that can be
   /// used to read and write to the remote side.
+  ///
+  /// If [agentForwarding] is true, requests SSH agent forwarding for this
+  /// session channel. If false, skips the request. If null, preserves the
+  /// historical behavior and requests forwarding when [agentHandler] is set.
   Future<SSHSession> execute(
     String command, {
     SSHPtyConfig? pty,
     SSHX11Config? x11,
     Map<String, String>? environment,
+    bool? agentForwarding,
   }) async {
     await _authenticated.future;
 
@@ -445,7 +450,7 @@ class SSHClient {
       }
     }
 
-    if (agentHandler != null) {
+    if ((agentForwarding ?? agentHandler != null) && agentHandler != null) {
       final agentOk = await channelController.sendAgentForwardingRequest();
       if (!agentOk) {
         channelController.close();
@@ -491,10 +496,15 @@ class SSHClient {
 
   /// Start a shell on the remote side. Returns a [SSHSession] that can be
   /// used to read, write and control the pty on the remote side.
+  ///
+  /// If [agentForwarding] is true, requests SSH agent forwarding for this
+  /// session channel. If false, skips the request. If null, preserves the
+  /// historical behavior and requests forwarding when [agentHandler] is set.
   Future<SSHSession> shell({
     SSHPtyConfig? pty = const SSHPtyConfig(),
     SSHX11Config? x11,
     Map<String, String>? environment,
+    bool? agentForwarding,
   }) async {
     await _authenticated.future;
 
@@ -512,7 +522,7 @@ class SSHClient {
       }
     }
 
-    if (agentHandler != null) {
+    if ((agentForwarding ?? agentHandler != null) && agentHandler != null) {
       final agentOk = await channelController.sendAgentForwardingRequest();
       if (!agentOk) {
         channelController.close();
@@ -598,6 +608,7 @@ class SSHClient {
     bool stdout = true,
     bool stderr = true,
     Map<String, String>? environment,
+    bool? agentForwarding,
   }) async {
     final result = await runWithResult(
       command,
@@ -605,6 +616,7 @@ class SSHClient {
       stdout: stdout,
       stderr: stderr,
       environment: environment,
+      agentForwarding: agentForwarding,
     );
 
     return result.output;
@@ -618,11 +630,13 @@ class SSHClient {
     bool stdout = true,
     bool stderr = true,
     Map<String, String>? environment,
+    bool? agentForwarding,
   }) async {
     final session = await execute(
       command,
       pty: runInPty ? const SSHPtyConfig() : null,
       environment: environment,
+      agentForwarding: agentForwarding,
     );
 
     final outputBuilder = BytesBuilder(copy: false);
